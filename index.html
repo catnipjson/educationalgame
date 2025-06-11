@@ -63,8 +63,17 @@
   </div>
   <div id="endScreen" style="display:none;"></div>
   <canvas id="game" width="800" height="600"></canvas>
-  <div id="touchControls">
-    <div>
+<div id="touchControls">
+  <div style="display: flex; flex-direction: column; gap: 5px;">
+    <button id="up">⬆️</button>
+    <div style="display: flex; gap: 5px;">
+      <button id="left">⬅️</button>
+      <button id="down">⬇️</button>
+      <button id="right">➡️</button>
+    </div>
+  </div>
+  <button id="shoot" style="height: 100px; width: 100px;">🔫</button>
+</div>
       <div class="btn" ontouchstart="touchMove('left')" ontouchend="stopMove()">←</div>
       <div class="btn" ontouchstart="touchMove('right')" ontouchend="stopMove()">→</div>
     </div>
