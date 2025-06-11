@@ -1,5 +1,5 @@
-fixes to come soon - movement updates soon
+CONTROLS;
+KEYBOARD + MOUSE: WASD to move, CLICK and HOLD to shoot
+TOUCH CONTROLS: SWIPE to move, TAP and HOLD to shoot
 
-CONTROLS:
-SHOOT button to shoot
-onscreen arrows to move
+small project :)
