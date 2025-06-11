@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>2D FPS Shooter</title>
+  <style>
+    canvas { background: #222; display: block; margin: auto; }
+    body { text-align: center; color: white; font-family: sans-serif; }
+  </style>
+</head>
+<body>
+  <h1>2D FPS Game</h1>
+  <p>WASD to move, Click to shoot. Avoid the AI!</p>
+  <canvas id="gameCanvas" width="800" height="600"></canvas>
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const player = {
+      x: 100, y: 100, size: 20, speed: 3,
+      hp: 100, color: 'lime'
+    };
+
+    const enemy = {
+      x: 700, y: 500, size: 20, speed: 2,
+      hp: 100, color: 'red',
+      cooldown: 0
+    };
+
+    const bullets = [];
+
+    const walls = [
+      { x: 200, y: 150, w: 100, h: 300 },
+      { x: 400, y: 100, w: 30, h: 400 },
+      { x: 600, y: 250, w: 100, h: 30 }
+    ];
+
+    let keys = {};
+
+    document.addEventListener('keydown', e => keys[e.key] = true);
+    document.addEventListener('keyup', e => keys[e.key] = false);
+
+    canvas.addEventListener('click', e => {
+      const angle = Math.atan2(e.offsetY - player.y, e.offsetX - player.x);
+      bullets.push({
+        x: player.x, y: player.y,
+        dx: Math.cos(angle) * 6,
+        dy: Math.sin(angle) * 6,
+        owner: 'player'
+      });
+    });
+
+    function move(obj, dx, dy) {
+      obj.x += dx;
+      obj.y += dy;
+      for (const wall of walls) {
+        if (obj.x > wall.x - obj.size &&
+            obj.x < wall.x + wall.w + obj.size &&
+            obj.y > wall.y - obj.size &&
+            obj.y < wall.y + wall.h + obj.size) {
+          obj.x -= dx;
+          obj.y -= dy;
+        }
+      }
+    }
+
+    function lineBlocked(x1, y1, x2, y2) {
+      for (const wall of walls) {
+        if (lineRectIntersect(x1, y1, x2, y2, wall)) return true;
+      }
+      return false;
+    }
+
+    function lineRectIntersect(x1, y1, x2, y2, rect) {
+      const {x, y, w, h} = rect;
+      return lineLine(x1, y1, x2, y2, x, y, x + w, y) ||
+             lineLine(x1, y1, x2, y2, x + w, y, x + w, y + h) ||
+             lineLine(x1, y1, x2, y2, x + w, y + h, x, y + h) ||
+             lineLine(x1, y1, x2, y2, x, y + h, x, y);
+    }
+
+    function lineLine(x1, y1, x2, y2, x3, y3, x4, y4) {
+      const uA = ((x4-x3)*(y1-y3)-(y4-y3)*(x1-x3)) / ((y4-y3)*(x2-x1)-(x4-x3)*(y2-y1));
+      const uB = ((x2-x1)*(y1-y3)-(y2-y1)*(x1-x3)) / ((y4-y3)*(x2-x1)-(x4-x3)*(y2-y1));
+      return uA >= 0 && uA <= 1 && uB >= 0 && uB <= 1;
+    }
+
+    function update() {
+      // Player Movement
+      const dx = (keys['d'] ? 1 : 0) - (keys['a'] ? 1 : 0);
+      const dy = (keys['s'] ? 1 : 0) - (keys['w'] ? 1 : 0);
+      move(player, dx * player.speed, dy * player.speed);
+
+      // Enemy AI
+      const dist = Math.hypot(player.x - enemy.x, player.y - enemy.y);
+      if (!lineBlocked(enemy.x, enemy.y, player.x, player.y)) {
+        if (enemy.cooldown <= 0) {
+          const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
+          bullets.push({
+            x: enemy.x, y: enemy.y,
+            dx: Math.cos(angle) * 6,
+            dy: Math.sin(angle) * 6,
+            owner: 'enemy'
+          });
+          enemy.cooldown = 60;
+        }
+      } else {
+        // Move toward player
+        const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
+        move(enemy, Math.cos(angle) * enemy.speed, Math.sin(angle) * enemy.speed);
+      }
+
+      enemy.cooldown = Math.max(0, enemy.cooldown - 1);
+
+      // Update Bullets
+      for (let i = bullets.length - 1; i >= 0; i--) {
+        const b = bullets[i];
+        b.x += b.dx;
+        b.y += b.dy;
+
+        if (walls.some(w => b.x > w.x && b.x < w.x + w.w && b.y > w.y && b.y < w.y + w.h)) {
+          bullets.splice(i, 1);
+          continue;
+        }
+
+        if (b.owner === 'player' &&
+            Math.hypot(b.x - enemy.x, b.y - enemy.y) < enemy.size) {
+          enemy.hp -= 15;
+          bullets.splice(i, 1);
+        } else if (b.owner === 'enemy' &&
+                   Math.hypot(b.x - player.x, b.y - player.y) < player.size) {
+          player.hp -= 15;
+          bullets.splice(i, 1);
+        }
+      }
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Draw walls
+      ctx.fillStyle = 'gray';
+      for (const wall of walls) {
+        ctx.fillRect(wall.x, wall.y, wall.w, wall.h);
+      }
+
+      // Draw player and enemy
+      ctx.fillStyle = player.color;
+      ctx.beginPath();
+      ctx.arc(player.x, player.y, player.size, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = enemy.color;
+      ctx.beginPath();
+      ctx.arc(enemy.x, enemy.y, enemy.size, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Draw bullets
+      ctx.fillStyle = 'white';
+      for (const b of bullets) {
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Draw HUD
+      ctx.fillStyle = 'white';
+      ctx.fillText(`Your HP: ${player.hp}`, 10, 20);
+      ctx.fillText(`Enemy HP: ${enemy.hp}`, 700, 20);
+
+      if (player.hp <= 0) ctx.fillText("You died!", 370, 300);
+      if (enemy.hp <= 0) ctx.fillText("Enemy defeated!", 340, 300);
+    }
+
+    function loop() {
+      if (player.hp > 0 && enemy.hp > 0) update();
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    loop();
+  </script>
+</body>
+</html>
