@@ -1,34 +1,61 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>2D FPS Shooter</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>2D FPS Game</title>
   <style>
-    canvas { background: #222; display: block; margin: auto; }
-    body { text-align: center; color: white; font-family: sans-serif; }
+    canvas {
+      background: #222;
+      display: block;
+      margin: auto;
+      touch-action: none;
+    }
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: sans-serif;
+      color: white;
+      text-align: center;
+    }
+    #joystick {
+      position: absolute;
+      left: 20px;
+      bottom: 20px;
+      width: 100px;
+      height: 100px;
+      border: 2px solid white;
+      border-radius: 50%;
+      touch-action: none;
+      opacity: 0.3;
+    }
+    #stick {
+      position: absolute;
+      width: 50px;
+      height: 50px;
+      background: white;
+      border-radius: 50%;
+      top: 25px;
+      left: 25px;
+      touch-action: none;
+    }
   </style>
 </head>
 <body>
-  <h1>2D FPS Game</h1>
-  <p>WASD to move, Click to shoot. Avoid the AI!</p>
   <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+  <!-- Virtual Joystick -->
+  <div id="joystick">
+    <div id="stick"></div>
+  </div>
+
   <script>
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
 
-    const player = {
-      x: 100, y: 100, size: 20, speed: 3,
-      hp: 100, color: 'lime'
-    };
-
-    const enemy = {
-      x: 700, y: 500, size: 20, speed: 2,
-      hp: 100, color: 'red',
-      cooldown: 0
-    };
-
+    const player = { x: 100, y: 100, size: 20, speed: 3, hp: 100, color: "lime" };
+    const enemy = { x: 700, y: 500, size: 20, speed: 2, hp: 100, color: "red", cooldown: 0 };
     const bullets = [];
-
     const walls = [
       { x: 200, y: 150, w: 100, h: 300 },
       { x: 400, y: 100, w: 30, h: 400 },
@@ -37,27 +64,34 @@
 
     let keys = {};
 
-    document.addEventListener('keydown', e => keys[e.key] = true);
-    document.addEventListener('keyup', e => keys[e.key] = false);
+    document.addEventListener("keydown", (e) => (keys[e.key] = true));
+    document.addEventListener("keyup", (e) => (keys[e.key] = false));
 
-    canvas.addEventListener('click', e => {
+    canvas.addEventListener("click", (e) => {
       const angle = Math.atan2(e.offsetY - player.y, e.offsetX - player.x);
+      shoot(player, angle, "player");
+    });
+
+    function shoot(origin, angle, owner) {
       bullets.push({
-        x: player.x, y: player.y,
+        x: origin.x,
+        y: origin.y,
         dx: Math.cos(angle) * 6,
         dy: Math.sin(angle) * 6,
-        owner: 'player'
+        owner
       });
-    });
+    }
 
     function move(obj, dx, dy) {
       obj.x += dx;
       obj.y += dy;
       for (const wall of walls) {
-        if (obj.x > wall.x - obj.size &&
-            obj.x < wall.x + wall.w + obj.size &&
-            obj.y > wall.y - obj.size &&
-            obj.y < wall.y + wall.h + obj.size) {
+        if (
+          obj.x > wall.x - obj.size &&
+          obj.x < wall.x + wall.w + obj.size &&
+          obj.y > wall.y - obj.size &&
+          obj.y < wall.y + wall.h + obj.size
+        ) {
           obj.x -= dx;
           obj.y -= dy;
         }
@@ -72,47 +106,54 @@
     }
 
     function lineRectIntersect(x1, y1, x2, y2, rect) {
-      const {x, y, w, h} = rect;
-      return lineLine(x1, y1, x2, y2, x, y, x + w, y) ||
-             lineLine(x1, y1, x2, y2, x + w, y, x + w, y + h) ||
-             lineLine(x1, y1, x2, y2, x + w, y + h, x, y + h) ||
-             lineLine(x1, y1, x2, y2, x, y + h, x, y);
+      const { x, y, w, h } = rect;
+      return (
+        lineLine(x1, y1, x2, y2, x, y, x + w, y) ||
+        lineLine(x1, y1, x2, y2, x + w, y, x + w, y + h) ||
+        lineLine(x1, y1, x2, y2, x + w, y + h, x, y + h) ||
+        lineLine(x1, y1, x2, y2, x, y + h, x, y)
+      );
     }
 
     function lineLine(x1, y1, x2, y2, x3, y3, x4, y4) {
-      const uA = ((x4-x3)*(y1-y3)-(y4-y3)*(x1-x3)) / ((y4-y3)*(x2-x1)-(x4-x3)*(y2-y1));
-      const uB = ((x2-x1)*(y1-y3)-(y2-y1)*(x1-x3)) / ((y4-y3)*(x2-x1)-(x4-x3)*(y2-y1));
+      const uA =
+        ((x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)) /
+        ((y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1));
+      const uB =
+        ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)) /
+        ((y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1));
       return uA >= 0 && uA <= 1 && uB >= 0 && uB <= 1;
     }
 
     function update() {
-      // Player Movement
-      const dx = (keys['d'] ? 1 : 0) - (keys['a'] ? 1 : 0);
-      const dy = (keys['s'] ? 1 : 0) - (keys['w'] ? 1 : 0);
-      move(player, dx * player.speed, dy * player.speed);
+      let dx = (keys["d"] ? 1 : 0) - (keys["a"] ? 1 : 0);
+      let dy = (keys["s"] ? 1 : 0) - (keys["w"] ? 1 : 0);
+
+      // Touch joystick overrides keyboard
+      if (touchInput.dx !== 0 || touchInput.dy !== 0) {
+        dx = touchInput.dx;
+        dy = touchInput.dy;
+      }
+
+      const mag = Math.hypot(dx, dy);
+      if (mag > 0) {
+        move(player, (dx / mag) * player.speed, (dy / mag) * player.speed);
+      }
 
       // Enemy AI
-      const dist = Math.hypot(player.x - enemy.x, player.y - enemy.y);
       if (!lineBlocked(enemy.x, enemy.y, player.x, player.y)) {
         if (enemy.cooldown <= 0) {
           const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
-          bullets.push({
-            x: enemy.x, y: enemy.y,
-            dx: Math.cos(angle) * 6,
-            dy: Math.sin(angle) * 6,
-            owner: 'enemy'
-          });
+          shoot(enemy, angle, "enemy");
           enemy.cooldown = 60;
         }
       } else {
-        // Move toward player
         const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
         move(enemy, Math.cos(angle) * enemy.speed, Math.sin(angle) * enemy.speed);
       }
 
       enemy.cooldown = Math.max(0, enemy.cooldown - 1);
 
-      // Update Bullets
       for (let i = bullets.length - 1; i >= 0; i--) {
         const b = bullets[i];
         b.x += b.dx;
@@ -123,12 +164,10 @@
           continue;
         }
 
-        if (b.owner === 'player' &&
-            Math.hypot(b.x - enemy.x, b.y - enemy.y) < enemy.size) {
+        if (b.owner === "player" && Math.hypot(b.x - enemy.x, b.y - enemy.y) < enemy.size) {
           enemy.hp -= 15;
           bullets.splice(i, 1);
-        } else if (b.owner === 'enemy' &&
-                   Math.hypot(b.x - player.x, b.y - player.y) < player.size) {
+        } else if (b.owner === "enemy" && Math.hypot(b.x - player.x, b.y - player.y) < player.size) {
           player.hp -= 15;
           bullets.splice(i, 1);
         }
@@ -137,14 +176,11 @@
 
     function draw() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      // Draw walls
-      ctx.fillStyle = 'gray';
+      ctx.fillStyle = "gray";
       for (const wall of walls) {
         ctx.fillRect(wall.x, wall.y, wall.w, wall.h);
       }
 
-      // Draw player and enemy
       ctx.fillStyle = player.color;
       ctx.beginPath();
       ctx.arc(player.x, player.y, player.size, 0, Math.PI * 2);
@@ -155,18 +191,16 @@
       ctx.arc(enemy.x, enemy.y, enemy.size, 0, Math.PI * 2);
       ctx.fill();
 
-      // Draw bullets
-      ctx.fillStyle = 'white';
+      ctx.fillStyle = "white";
       for (const b of bullets) {
         ctx.beginPath();
         ctx.arc(b.x, b.y, 4, 0, Math.PI * 2);
         ctx.fill();
       }
 
-      // Draw HUD
-      ctx.fillStyle = 'white';
+      ctx.fillStyle = "white";
       ctx.fillText(`Your HP: ${player.hp}`, 10, 20);
-      ctx.fillText(`Enemy HP: ${enemy.hp}`, 700, 20);
+      ctx.fillText(`Enemy HP: ${enemy.hp}`, 680, 20);
 
       if (player.hp <= 0) ctx.fillText("You died!", 370, 300);
       if (enemy.hp <= 0) ctx.fillText("Enemy defeated!", 340, 300);
@@ -179,6 +213,50 @@
     }
 
     loop();
+
+    // --- Touch Controls ---
+    const joystick = document.getElementById("joystick");
+    const stick = document.getElementById("stick");
+    let touchInput = { dx: 0, dy: 0 };
+
+    let centerX = joystick.offsetLeft + 50;
+    let centerY = joystick.offsetTop + 50;
+
+    function handleJoystick(e) {
+      const touch = e.touches[0];
+      const x = touch.clientX - centerX;
+      const y = touch.clientY - centerY;
+
+      const dist = Math.min(40, Math.hypot(x, y));
+      const angle = Math.atan2(y, x);
+
+      const dx = Math.cos(angle) * dist;
+      const dy = Math.sin(angle) * dist;
+
+      stick.style.left = `${25 + dx}px`;
+      stick.style.top = `${25 + dy}px`;
+
+      touchInput.dx = dx / 40;
+      touchInput.dy = dy / 40;
+    }
+
+    function resetJoystick() {
+      stick.style.left = `25px`;
+      stick.style.top = `25px`;
+      touchInput.dx = 0;
+      touchInput.dy = 0;
+    }
+
+    joystick.addEventListener("touchstart", handleJoystick);
+    joystick.addEventListener("touchmove", handleJoystick);
+    joystick.addEventListener("touchend", resetJoystick);
+
+    // Touch shooting
+    canvas.addEventListener("touchstart", (e) => {
+      if (player.hp <= 0 || enemy.hp <= 0) return;
+      const angle = Math.atan2(enemy.y - player.y, enemy.x - player.x);
+      shoot(player, angle, "player");
+    });
   </script>
 </body>
 </html>
