@@ -1,1 +1,1 @@
-joinhotel.github.io
+educationalgame.github.io
