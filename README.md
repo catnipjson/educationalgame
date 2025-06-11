@@ -1,4 +1,5 @@
+fixes to come soon - movement updates soon
+
 CONTROLS:
-click/tap to shoot
-wasd to move w/ keyboard
-drag/swipe to move with touch controls
+SHOOT button to shoot
+onscreen arrows to move
