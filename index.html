@@ -1,263 +1,199 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>DEADZONE</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>deadzone</title>
   <style>
     html, body {
       margin: 0;
-      padding: 0;
       overflow: hidden;
-      background: black;
+      font-family: sans-serif;
+      background: #000;
       color: white;
-      font-family: Arial, sans-serif;
     }
-    canvas {
-      display: block;
-      background: #111;
-      touch-action: none;
-    }
-    #overlay {
+
+    #menu, #gameOver {
       position: absolute;
-      top: 0;
-      left: 0;
       width: 100%;
       height: 100%;
+      background: rgba(0,0,0,0.9);
       display: flex;
-      justify-content: center;
       align-items: center;
+      justify-content: center;
       flex-direction: column;
-      background: rgba(0,0,0,0.8);
       z-index: 10;
     }
-    .button {
-      background: #333;
-      padding: 20px 40px;
-      color: white;
-      border: 2px solid white;
-      font-size: 24px;
-      cursor: pointer;
-      margin-top: 20px;
+
+    #hud {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      font-size: 18px;
+      z-index: 5;
     }
-    .big-text {
-      font-size: 48px;
-      font-weight: bold;
+
+    canvas {
+      display: block;
+    }
+
+    #touchControls {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      right: 10px;
+      display: flex;
+      justify-content: space-between;
+      z-index: 5;
+    }
+
+    .btn {
+      background: rgba(255,255,255,0.2);
+      border: 1px solid #fff;
+      border-radius: 5px;
+      color: #fff;
+      padding: 20px;
+      margin: 5px;
+      font-size: 16px;
+      touch-action: none;
     }
   </style>
 </head>
 <body>
+
+<div id="menu">
+  <h1>🕹️ Browser FPS</h1>
+  <button onclick="startGame()">Play</button>
+</div>
+
+<div id="gameOver" style="display:none;">
+  <h1>💀 You Died</h1>
+  <p id="finalStats"></p>
+  <button onclick="startGame()">Play Again</button>
+</div>
+
 <canvas id="gameCanvas"></canvas>
-<div id="overlay">
-  <div class="big-text">DEADZONE</div>
-  <div class="button" onclick="startGame()">PLAY</div>
+
+<div id="hud">Health: 100 | Ammo: ∞ | Kills: 0</div>
+
+<div id="touchControls">
+  <div>
+    <button class="btn" id="leftBtn">←</button>
+    <button class="btn" id="rightBtn">→</button>
+  </div>
+  <button class="btn" id="shootBtn">🔫</button>
 </div>
 
 <script>
-const canvas = document.getElementById("gameCanvas");
-const ctx = canvas.getContext("2d");
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+let width, height;
 
-let player, enemy, bullets = [], walls = [], keys = {}, touchStart = null;
-let gameState = 'menu', countdown = 3, lastShot = 0;
-let playerWins = 0, enemyWins = 0, currentRound = 1;
-
-const roundMaps = [
-  [{x:300,y:200,w:200,h:30}, {x:600,y:400,w:30,h:200}],
-  [{x:400,y:100,w:300,h:30}, {x:500,y:300,w:30,h:300}],
-  [{x:200,y:200,w:30,h:300}, {x:700,y:100,w:200,h:30}]
-];
-
-function resetRound() {
-  player = { x: 100, y: 100, size: 20, color: 'green', hp: 200 };
-  enemy = { x: canvas.width - 120, y: 100, size: 20, color: 'red', hp: 200 };
-  bullets = [];
-  walls = roundMaps[(currentRound - 1) % roundMaps.length];
+function resize() {
+  width = canvas.width = window.innerWidth;
+  height = canvas.height = window.innerHeight;
 }
+window.onresize = resize;
+resize();
+
+let player, bullets, enemies, kills, health;
+let keys = {};
+let touch = { left: false, right: false };
+let gameRunning = false;
+
+document.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
+document.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+
+document.getElementById('leftBtn').addEventListener('touchstart', () => touch.left = true);
+document.getElementById('leftBtn').addEventListener('touchend', () => touch.left = false);
+document.getElementById('rightBtn').addEventListener('touchstart', () => touch.right = true);
+document.getElementById('rightBtn').addEventListener('touchend', () => touch.right = false);
+document.getElementById('shootBtn').addEventListener('touchstart', shoot);
+
+canvas.addEventListener('click', shoot);
 
 function startGame() {
-  document.getElementById("overlay").style.display = "none";
-  gameState = 'countdown';
-  countdown = 3;
-  playerWins = 0;
-  enemyWins = 0;
-  currentRound = 1;
-  resetRound();
+  document.getElementById('menu').style.display = 'none';
+  document.getElementById('gameOver').style.display = 'none';
+  gameRunning = true;
+  player = { x: width/2, y: height - 100, dir: 0 };
+  bullets = [];
+  enemies = [];
+  kills = 0;
+  health = 100;
+  spawnEnemy();
+  update();
 }
 
-function drawHUD() {
-  ctx.fillStyle = "white";
-  ctx.font = "20px Arial";
-  ctx.fillText("HP: " + player.hp, 20, 30);
-  ctx.fillText("HP: " + enemy.hp, canvas.width - 100, 30);
-  ctx.fillText("Player Wins: " + playerWins, 20, canvas.height - 20);
-  ctx.fillText("Enemy Wins: " + enemyWins, canvas.width - 160, canvas.height - 20);
+function shoot() {
+  if (!gameRunning) return;
+  bullets.push({ x: player.x, y: player.y - 20 });
 }
 
-function shoot(x, y, shooter, targetColor) {
-  const angle = Math.atan2(y - shooter.y, x - shooter.x);
-  bullets.push({
-    x: shooter.x,
-    y: shooter.y,
-    dx: Math.cos(angle) * 5,
-    dy: Math.sin(angle) * 5,
-    color: targetColor,
-    owner: shooter
-  });
+function spawnEnemy() {
+  if (!gameRunning) return;
+  const x = Math.random() * width;
+  enemies.push({ x, y: -50, health: 2 });
+  setTimeout(spawnEnemy, 1000);
 }
 
-function handleMovement() {
-  const speed = 3;
-  if (keys['w'] || keys['arrowup']) player.y -= speed;
-  if (keys['s'] || keys['arrowdown']) player.y += speed;
-  if (keys['a'] || keys['arrowleft']) player.x -= speed;
-  if (keys['d'] || keys['arrowright']) player.x += speed;
-}
+function update() {
+  if (!gameRunning) return;
+  requestAnimationFrame(update);
+  ctx.fillStyle = '#333';
+  ctx.fillRect(0, 0, width, height);
 
-function updateBullets() {
+  // Move player
+  if (keys['a'] || touch.left) player.x -= 5;
+  if (keys['d'] || touch.right) player.x += 5;
+  player.x = Math.max(0, Math.min(width, player.x));
+
+  // Draw player gun
+  ctx.fillStyle = '#0f0';
+  ctx.fillRect(player.x - 10, player.y, 20, 40);
+
+  // Draw and move bullets
+  ctx.fillStyle = '#ff0';
   bullets.forEach((b, i) => {
-    b.x += b.dx;
-    b.y += b.dy;
+    b.y -= 10;
+    ctx.fillRect(b.x - 2, b.y, 4, 10);
+    if (b.y < 0) bullets.splice(i, 1);
+  });
 
-    let hit = false;
-    walls.forEach(w => {
-      if (b.x > w.x && b.x < w.x + w.w && b.y > w.y && b.y < w.y + w.h) hit = true;
+  // Draw enemies
+  ctx.fillStyle = '#f00';
+  enemies.forEach((e, i) => {
+    e.y += 2;
+    ctx.fillRect(e.x - 15, e.y, 30, 30);
+
+    // Check collision with bullets
+    bullets.forEach((b, j) => {
+      if (Math.abs(b.x - e.x) < 20 && Math.abs(b.y - e.y) < 20) {
+        e.health--;
+        bullets.splice(j, 1);
+        if (e.health <= 0) {
+          enemies.splice(i, 1);
+          kills++;
+        }
+      }
     });
 
-    if (b.color === 'red' && Math.hypot(b.x - player.x, b.y - player.y) < 20) {
-      player.hp -= 10;
-      hit = true;
-    } else if (b.color === 'green' && Math.hypot(b.x - enemy.x, b.y - enemy.y) < 20) {
-      enemy.hp -= 10;
-      hit = true;
-    }
-
-    if (hit || b.x < 0 || b.y < 0 || b.x > canvas.width || b.y > canvas.height) {
-      bullets.splice(i, 1);
+    // Enemy hits player
+    if (e.y > height - 100 && Math.abs(e.x - player.x) < 30) {
+      enemies.splice(i, 1);
+      health -= 20;
+      if (health <= 0) endGame();
     }
   });
+
+  // Update HUD
+  document.getElementById('hud').textContent = `Health: ${health} | Ammo: ∞ | Kills: ${kills}`;
 }
 
-function draw() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  ctx.fillStyle = "#444";
-  walls.forEach(w => ctx.fillRect(w.x, w.y, w.w, w.h));
-
-  ctx.fillStyle = player.color;
-  ctx.beginPath();
-  ctx.arc(player.x, player.y, player.size, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = enemy.color;
-  ctx.beginPath();
-  ctx.arc(enemy.x, enemy.y, enemy.size, 0, Math.PI * 2);
-  ctx.fill();
-
-  bullets.forEach(b => {
-    ctx.fillStyle = b.color;
-    ctx.beginPath();
-    ctx.arc(b.x, b.y, 5, 0, Math.PI * 2);
-    ctx.fill();
-  });
-
-  drawHUD();
+function endGame() {
+  gameRunning = false;
+  document.getElementById('finalStats').textContent = `You killed ${kills} enemies.`;
+  document.getElementById('gameOver').style.display = 'flex';
 }
-
-function drawEndScreen(text) {
-  ctx.fillStyle = "black";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = "white";
-  ctx.font = "60px Arial";
-  ctx.textAlign = "center";
-  ctx.fillText(text, canvas.width / 2, canvas.height / 2);
-}
-
-function gameLoop() {
-  requestAnimationFrame(gameLoop);
-
-  if (gameState === 'countdown') {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "white";
-    ctx.font = "80px Arial";
-    ctx.textAlign = "center";
-    ctx.fillText(countdown, canvas.width / 2, canvas.height / 2);
-    return;
-  }
-
-  if (gameState === 'play') {
-    handleMovement();
-    updateBullets();
-    if (enemy.hp > 0) {
-      if (Math.random() < 0.01) shoot(player.x, player.y, enemy, 'red');
-    }
-    if (player.hp <= 0 || enemy.hp <= 0) {
-      if (player.hp > 0) playerWins++;
-      else enemyWins++;
-
-      if (playerWins === 3 || enemyWins === 3) {
-        gameState = 'end';
-        setTimeout(() => {
-          gameState = 'menu';
-          document.getElementById("overlay").style.display = "flex";
-        }, 3000);
-      } else {
-        currentRound++;
-        resetRound();
-        countdown = 3;
-        gameState = 'countdown';
-        return;
-      }
-    }
-
-    draw();
-  }
-
-  if (gameState === 'end') {
-    drawEndScreen(playerWins === 3 ? "YOU WIN" : "YOU LOSE");
-  }
-}
-
-setInterval(() => {
-  if (gameState === 'countdown') {
-    countdown--;
-    if (countdown === 0) gameState = 'play';
-  }
-}, 1000);
-
-canvas.addEventListener("mousedown", e => {
-  if (gameState !== 'play') return;
-  const now = Date.now();
-  if (now - lastShot > 500) {
-    shoot(e.clientX, e.clientY, player, 'green');
-    lastShot = now;
-  }
-});
-
-document.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
-document.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
-
-// Touch controls
-canvas.addEventListener("touchstart", e => {
-  const touch = e.touches[0];
-  touchStart = { x: touch.clientX, y: touch.clientY };
-  // shoot on tap
-  shoot(touch.clientX, touch.clientY, player, 'green');
-});
-
-canvas.addEventListener("touchmove", e => {
-  if (!touchStart) return;
-  const touch = e.touches[0];
-  const dx = touch.clientX - touchStart.x;
-  const dy = touch.clientY - touchStart.y;
-  player.x += dx * 0.1;
-  player.y += dy * 0.1;
-  touchStart = { x: touch.clientX, y: touch.clientY };
-});
-
-gameLoop();
 </script>
 </body>
 </html>
